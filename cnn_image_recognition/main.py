@@ -37,7 +37,7 @@ else:
 print(f"Using device: {device}")
 
 
-def plot_learning_curve(func):
+def plot_curves(func):
 	@wraps(func)
 	def wrapper(*args, **kwargs):
 		model, train_losses, val_losses, epoch_number = func(*args, **kwargs)
@@ -71,7 +71,7 @@ def plot_learning_curve(func):
 	return wrapper
 
 
-@plot_learning_curve
+@plot_curves
 def train_loop(model, criterion):
 	num_epochs = 100
 	optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.7)
