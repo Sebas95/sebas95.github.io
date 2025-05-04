@@ -1,16 +1,20 @@
 import torch
 import os 
-
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch.nn as nn
 import datetime
+
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+from functools import wraps
 
 # Local imports
 from conv_net import ConvNet
 
 model_path = './checkpoints/persistedmodel.pth'
+learning_curve_path = './plots/learning_curve.png'
+overfit_curve_path = './plots/overfit_curve.png'
 
 # Retrieve the data set 
 tensor_transform = transforms.ToTensor()
@@ -33,12 +37,49 @@ else:
 print(f"Using device: {device}")
 
 
+def plot_learning_curve(func):
+	@wraps(func)
+	def wrapper(*args, **kwargs):
+		model, train_losses, val_losses, epoch_number = func(*args, **kwargs)
+
+        # Plot after training
+		plt.figure(figsize=(8, 5))
+		plt.plot(epoch_number, train_losses, label='Training Loss', marker='o')
+		plt.title("Learning Curve")
+		plt.xlabel("Epoch")
+		plt.ylabel("Loss")
+		plt.grid(True)
+		plt.legend()
+		plt.tight_layout()
+		plt.savefig(learning_curve_path)
+		plt.close()
+
+		plt.figure(figsize=(10, 5))
+		plt.plot(epoch_number, train_losses, label='Train Loss', marker='o')
+		plt.plot(epoch_number, val_losses, label='Validation Loss', marker='x')
+		plt.title("Overfitting Plot")
+		plt.xlabel("Epoch")
+		plt.ylabel("Loss")
+		plt.legend()
+		plt.grid(True)
+		plt.tight_layout()
+		plt.savefig(overfit_curve_path)
+		plt.close()
+
+		return model  # Return just the model, clean interface
+
+	return wrapper
+
+
+@plot_learning_curve
 def train_loop(model, criterion):
 	num_epochs = 100
 	optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.7)
 		
-	losses = []
+	train_losses = []
 	epoch_number = []
+	val_losses = []
+	
 	for epoch in range(num_epochs):
 		epoch_losses = []
 		for x_train, y_train in train_loader:
@@ -66,13 +107,17 @@ def train_loop(model, criterion):
 		
 		# Get the lost of last epoch 
 		epoch_loss = torch.stack(epoch_losses).mean().item()  
-		losses.append(epoch_loss)
+		train_losses.append(epoch_loss)
 		epoch_number.append(epoch)
 		
 		print(f"Epoch {epoch} | Loss: {epoch_loss:.4f}")
 		
-	return model
-	
+		# Get the validation loss
+		val_loss, _ = test_loop(model, criterion)
+		val_losses.append(val_loss)
+    
+	return model, train_losses, val_losses, epoch_number
+
 
 def test_loop(model, criterion):
 	
@@ -82,21 +127,23 @@ def test_loop(model, criterion):
 	total = 0
 
 	with torch.no_grad():
-		for inputs, labels in test_loader:
-			inputs, labels = inputs.to(device), labels.to(device)
+		for x_test, y_test in test_loader:
+			x_test, y_test = x_test.to(device), y_test.to(device)
 		        
-			outputs = model(inputs)
-			loss = criterion(outputs, labels)
-			test_loss += loss.item() * inputs.size(0)
+			outputs = model(x_test)
+			loss = criterion(outputs, y_test)
+			test_loss += loss.item() * x_test.size(0)
 		        
 			_, predicted = torch.max(outputs, 1)
-			total += labels.size(0)
-			correct += (predicted == labels).sum().item()
+			total += y_test.size(0)
+			correct += (predicted == y_test).sum().item()
 
 		avg_loss = test_loss / total
 		accuracy = correct / total
 
 		print(f'Test Loss: {avg_loss:.4f} | Accuracy: {accuracy * 100:.2f}%')
+		
+		return avg_loss, accuracy
 
 
 # Start the training loop
