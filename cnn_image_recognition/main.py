@@ -4,10 +4,14 @@ import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch.nn as nn
 import datetime
+import argparse
+import io
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from functools import wraps
+from torchinfo import summary
+from torchviz import make_dot
 
 # Local imports
 from conv_net import ConvNet
@@ -15,26 +19,8 @@ from conv_net import ConvNet
 model_path = './checkpoints/persistedmodel.pth'
 learning_curve_path = './plots/learning_curve.png'
 overfit_curve_path = './plots/overfit_curve.png'
-
-# Retrieve the data set 
-tensor_transform = transforms.ToTensor()
-normalization_transform = transforms.Normalize((0.5,), (0.5,))
-transform = transforms.Compose([tensor_transform, normalization_transform])
-
-train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
-
-
-# Check if CUDA is available
-if torch.cuda.is_available():
-	device = torch.device('cuda')
-else:
-	device = torch.device('cpu')
-    
-print(f"Using device: {device}")
+model_graph_path = './plots/model_graph'
+model_summary_path = './plots/model_summary.txt'
 
 
 def plot_curves(func):
@@ -146,16 +132,57 @@ def test_loop(model, criterion):
 		return avg_loss, accuracy
 
 
-# Start the training loop
-model = ConvNet().to(device)
-criterion = nn.CrossEntropyLoss()
-	
-if os.path.exists(model_path):
-	model.load_state_dict(torch.load(model_path))
-else:
-	model = train_loop(model, criterion)
-	torch.save(model.state_dict(), model_path)
-	
-# Test loop
-test_loop(model, criterion)
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description="Train and test CNN")
+	parser.add_argument("--model-path", type=str, help="Path to .pth file with model state_dict")
+
+	# Retrieve the data set 
+	tensor_transform = transforms.ToTensor()
+	normalization_transform = transforms.Normalize((0.5,), (0.5,))
+	transform = transforms.Compose([tensor_transform, normalization_transform])
+
+	train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+	test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+
+	train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+	test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+
+	# Check if CUDA is available
+	if torch.cuda.is_available():
+		device = torch.device('cuda')
+	else:
+		device = torch.device('cpu')
+		
+	print(f"Using device: {device}")
+
+	# Start the training loop
+	model = ConvNet().to(device)
+	criterion = nn.CrossEntropyLoss()
+		
+	if os.path.exists(model_path):
+		model.load_state_dict(torch.load(model_path))
+	else:
+		model = train_loop(model, criterion)
+		torch.save(model.state_dict(), model_path)
+		
+	# Test loop
+	test_loop(model, criterion)
+
+	# Print summary
+	input_size = (64, 3, 32, 32)
+
+	# Capture the summary as a string
+	bufferStr = io.StringIO()
+	summary(model, input_size=input_size)
+
+	# Dummy input
+	x = torch.randn(1, 3, 32, 32).to(device)
+
+	# Forward pass
+	y = model(x)
+
+	# Create diagram
+	make_dot(y, params=dict(model.named_parameters())).render(model_graph_path, format="png")
+
 
