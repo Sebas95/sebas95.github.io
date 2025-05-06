@@ -154,7 +154,7 @@ if os.path.exists(model_path):
 	model.load_state_dict(torch.load(model_path))
 else:
 	model = train_loop(model, criterion)
-	torch.save(model.state_dict(), f'./checkpoints/persistedmodel.pth')
+	torch.save(model.state_dict(), model_path)
 	
 # Test loop
 test_loop(model, criterion)
