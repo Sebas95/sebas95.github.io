@@ -16,7 +16,7 @@ from torchviz import make_dot
 # Local imports
 from conv_net import ConvNet
 
-model_path = './checkpoints/persistedmodel.pth'
+default_model_path = './checkpoints/persistedmodel.pth'
 learning_curve_path = './plots/learning_curve.png'
 overfit_curve_path = './plots/overfit_curve.png'
 model_graph_path = './plots/model_graph'
@@ -58,8 +58,7 @@ def plot_curves(func):
 
 
 @plot_curves
-def train_loop(model, criterion):
-	num_epochs = 100
+def train_loop(model, criterion, num_epochs):
 	optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.7)
 		
 	train_losses = []
@@ -134,7 +133,13 @@ def test_loop(model, criterion):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Train and test CNN")
+	
+	# Required parameters first
+	parser.add_argument("--epochs", type=int, help="Numer of epochs", required=True)
+	
+	# Optional parameters
 	parser.add_argument("--model-path", type=str, help="Path to .pth file with model state_dict")
+	args = parser.parse_args()
 
 	# Retrieve the data set 
 	tensor_transform = transforms.ToTensor()
@@ -159,13 +164,18 @@ if __name__ == "__main__":
 	# Start the training loop
 	model = ConvNet().to(device)
 	criterion = nn.CrossEntropyLoss()
-		
-	if os.path.exists(model_path):
-		model.load_state_dict(torch.load(model_path))
+	
+	# If model passed as parameter, retrieve it from store	
+	if args.model_path:
+		print(f"Loading model from {args.model_path}...")
+		model.load_state_dict(torch.load(args.model_path))
+		print(f"Loaded model: {args.model_path}...")
 	else:
-		model = train_loop(model, criterion)
-		torch.save(model.state_dict(), model_path)
-		
+		print(f"Training model from scratch...")
+		model = train_loop(model, criterion, args.epochs)
+		print(f"Saving model into {default_model_path}...")
+		torch.save(model.state_dict(), default_model_path)
+
 	# Test loop
 	test_loop(model, criterion)
 
@@ -183,6 +193,6 @@ if __name__ == "__main__":
 	y = model(x)
 
 	# Create diagram
-	make_dot(y, params=dict(model.named_parameters())).render(model_graph_path, format="png")
+	make_dot(y, params=dict(model.named_parameters())).render(model_graph_path, format="png", cleanup=True)
 
 
