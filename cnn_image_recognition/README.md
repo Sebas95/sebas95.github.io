@@ -9,12 +9,12 @@ High efficiency convolutional neural network model for image recognition in CIFA
 To train the model from scratch don't specify a file location
 
 ```
-python main.py --epochs 10
+python main.py --epochs 10 --model EffConvNet
 ```
 
 To load model from existing file. Usage example:
 ```
-python main.py --model-path './checkpoints/persistedmodel.pth'
+python main.py --epochs 10 --model EffConvNet --model-path './checkpoints/persistedmodel.pth'
 ```
 
 

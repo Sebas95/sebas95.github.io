@@ -17,11 +17,24 @@ from torchviz import make_dot
 from conv_net import ConvNet
 
 default_model_path = './checkpoints/persistedmodel.pth'
-learning_curve_path = './plots/learning_curve.png'
-overfit_curve_path = './plots/overfit_curve.png'
-model_graph_path = './plots/model_graph'
-model_summary_path = './plots/model_summary.txt'
 
+PLOTS_ROOT_DIR = './plots'
+
+# Map the code name to the class name
+VALID_MODELS = {ConvNet.__name__ : "EffConvNet"}
+
+
+def build_plot_destination_path(model, file_name):
+
+	model_name = type(model).__name__	
+	folder_name = VALID_MODELS[model_name]
+	
+	# Prepare directories for plots
+	model_plot_base_directory = f"{PLOTS_ROOT_DIR}/{folder_name}"
+	if not os.path.isdir(model_plot_base_directory):
+		os.mkdir(model_plot_base_directory)
+	
+	return f'{PLOTS_ROOT_DIR}/{folder_name}/{file_name}'
 
 def plot_curves(func):
 	@wraps(func)
@@ -37,7 +50,8 @@ def plot_curves(func):
 		plt.grid(True)
 		plt.legend()
 		plt.tight_layout()
-		plt.savefig(learning_curve_path)
+		file_name = build_plot_destination_path(model, 'learning_curve.png')
+		plt.savefig(file_name)
 		plt.close()
 
 		plt.figure(figsize=(10, 5))
@@ -49,7 +63,8 @@ def plot_curves(func):
 		plt.legend()
 		plt.grid(True)
 		plt.tight_layout()
-		plt.savefig(overfit_curve_path)
+		file_name = build_plot_destination_path(model, 'overfit_curve.png')
+		plt.savefig(file_name)
 		plt.close()
 
 		return model  # Return just the model, clean interface
@@ -136,10 +151,15 @@ if __name__ == "__main__":
 	
 	# Required parameters first
 	parser.add_argument("--epochs", type=int, help="Numer of epochs", required=True)
+	parser.add_argument("--model", type=str, help=f"Available model to use: {', '.join(VALID_MODELS.values())}", required=True)
 	
 	# Optional parameters
 	parser.add_argument("--model-path", type=str, help="Path to .pth file with model state_dict")
 	args = parser.parse_args()
+	
+	# Validate the model name
+	if args.model not in VALID_MODELS.values():
+		raise ValueError(f"❌ Invalid model: '{args.model}'. Valid options are: {', '.join(VALID_MODELS.values())}")
 
 	# Retrieve the data set 
 	tensor_transform = transforms.ToTensor()
@@ -193,6 +213,7 @@ if __name__ == "__main__":
 	y = model(x)
 
 	# Create diagram
-	make_dot(y, params=dict(model.named_parameters())).render(model_graph_path, format="png", cleanup=True)
+	file_name = build_plot_destination_path(model, 'model_graph')
+	make_dot(y, params=dict(model.named_parameters())).render(file_name, format="png", cleanup=True)
 
 
